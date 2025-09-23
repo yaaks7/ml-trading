@@ -1,6 +1,6 @@
 # 📊 Performance Metrics & Evaluation Guide
 
-> Complete guide to understanding the metrics used to evaluate trading strategies and ML models, with interpretation guidelines for financial performance analysis.
+> Guide to understanding the metrics used to evaluate trading strategies and ML models, with interpretation guidelines for financial performance analysis.
 
 ## 📋 Overview
 
@@ -53,8 +53,6 @@ CAGR = (Final Value / Initial Value)^(1/Years) - 1
 
 **Interpretation:**
 - **Standard for comparing strategies** over different periods
-- **Accounts for compounding** effects
-- **More meaningful than average returns**
 
 ---
 
@@ -71,8 +69,6 @@ Volatility = √(Σ(Return - Mean Return)² / (N-1))
 - **<10%**: Low volatility (conservative strategies)
 - **10-20%**: Moderate volatility (typical for diversified portfolios)
 - **>20%**: High volatility (aggressive strategies)
-
-**Key Insight:** *Higher volatility isn't always bad if returns are proportionally higher*
 
 ### **Downside Deviation**
 Like volatility, but only considers negative returns - focuses on downside risk.
@@ -92,7 +88,6 @@ The maximum expected loss at a given confidence level (e.g., 95%) over a specifi
 **Interpretation:**
 - **VaR 95% = 2%**: 95% chance daily loss won't exceed 2%
 - **Higher confidence = larger VaR**: 99% VaR > 95% VaR
-- **Useful for risk budgeting**: Set position sizes based on VaR
 
 ---
 
@@ -125,8 +120,6 @@ Sortino Ratio = (Strategy Return - Target Return) / Downside Deviation
 
 **Interpretation:**
 - **Better than Sharpe** for strategies with asymmetric returns
-- **Higher values preferred** (same interpretation as Sharpe)
-- **More relevant for investors** who don't mind upside volatility
 
 ### **Calmar Ratio**
 Compares annualized return to maximum drawdown.
@@ -155,16 +148,7 @@ Maximum Drawdown = max(All Drawdowns)
 **Interpretation:**
 - **<10%**: Conservative strategy
 - **10-20%**: Moderate risk
-- **>30%**: High risk (many investors can't psychologically handle)
-
-**Key Insight:** *This is what you'll experience during the worst period*
-
-### **Average Drawdown**
-The typical drawdown magnitude across all drawdown periods.
-
-**Interpretation:**
-- **Gives sense of normal risk** vs worst-case (MDD)
-- **Should be much smaller than MDD** for stable strategies
+- **>30%**: High risk
 
 ### **Drawdown Duration**
 How long it takes to recover from drawdowns.
@@ -199,7 +183,7 @@ Win Rate = Number of Winning Trades / Total Trades
 **Interpretation:**
 - **>50%**: More winners than losers
 - **40-60%**: Typical for most strategies
-- **>70%**: Excellent (but check if winners are small)
+- **>70%**: Excellent
 
 **Important:** *High win rate doesn't guarantee profitability if losses are large*
 
@@ -241,25 +225,6 @@ Risk-Reward Ratio = Average Win / Average Loss
 
 ---
 
-## 🔍 Comparative Analysis
-
-### **Benchmark Comparison**
-Always compare strategy metrics to relevant benchmarks:
-
-| Metric | Strategy | Buy & Hold | Moving Avg | Interpretation |
-|--------|----------|------------|------------|----------------|
-| Total Return | 15% | 12% | 8% | ✅ Strategy wins |
-| Volatility | 18% | 20% | 15% | ✅ Lower risk |
-| Sharpe Ratio | 0.83 | 0.60 | 0.53 | ✅ Better risk-adj |
-| Max Drawdown | 12% | 25% | 18% | ✅ Better downside |
-
-### **Statistical Significance**
-- **T-Test**: Are returns statistically different from benchmark?
-- **Confidence Intervals**: What's the range of likely outcomes?
-- **Bootstrapping**: How robust are the results?
-
----
-
 ## 📊 Interpretation Framework
 
 ### **🟢 Strong Performance Indicators**
@@ -282,92 +247,3 @@ Always compare strategy metrics to relevant benchmarks:
 - **Performance Too Good**: May indicate data snooping or errors
 
 ---
-
-## 📈 Context-Dependent Interpretation
-
-### **Market Conditions Matter**
-
-#### **Bull Market Performance**
-- **Buy & Hold is hard to beat** in rising markets
-- **Focus on risk metrics** rather than absolute returns
-- **Downside protection** becomes key differentiator
-
-#### **Bear Market Performance**
-- **Capital preservation** is primary goal
-- **Negative returns acceptable** if less negative than benchmark
-- **Quick recovery** from drawdowns is crucial
-
-#### **Sideways Market Performance**
-- **Any positive return** is good achievement
-- **Low volatility strategies** shine
-- **Transaction costs** become more important
-
-### **Time Horizon Considerations**
-
-#### **Short-Term Analysis (< 1 Year)**
-- **Higher volatility acceptable** for active strategies
-- **Focus on risk management** over absolute returns
-- **Transaction costs more impactful**
-
-#### **Long-Term Analysis (> 3 Years)**
-- **Compound returns** become dominant factor
-- **Consistency** more important than peak performance
-- **Risk-adjusted metrics** most relevant
-
----
-
-## 🎯 Practical Guidelines
-
-### **Setting Realistic Expectations**
-
-#### **Reasonable Targets for ML Trading:**
-- **Total Return**: Beat benchmark by 2-5% annually
-- **Sharpe Ratio**: 0.1-0.3 improvement over benchmark
-- **Max Drawdown**: 20-40% reduction vs buy & hold
-- **Win Rate**: 52-58% for binary classification
-
-#### **Unrealistic Expectations:**
-- **Sharpe Ratio > 3.0**: Extremely rare in practice
-- **Max Drawdown < 5%**: Very difficult to achieve with meaningful returns
-- **Win Rate > 80%**: Often indicates overfitting
-- **Returns > 50% annually**: Unsustainable long-term
-
-### **Metric Selection by Investor Type**
-
-#### **Conservative Investors:**
-- **Primary**: Max Drawdown, Downside Deviation
-- **Secondary**: Calmar Ratio, Sortino Ratio
-- **Focus**: Capital preservation
-
-#### **Aggressive Investors:**
-- **Primary**: Total Return, CAGR
-- **Secondary**: Sharpe Ratio
-- **Focus**: Return maximization
-
-#### **Professional Traders:**
-- **Primary**: Sharpe Ratio, Profit Factor
-- **Secondary**: Win Rate, Risk-Reward Ratio
-- **Focus**: Risk-adjusted performance
-
----
-
-## 📚 Advanced Considerations
-
-### **Out-of-Sample Testing**
-- **Walk-Forward Analysis**: Test on unseen future data
-- **Cross-Validation**: Multiple train/test splits
-- **Paper Trading**: Real-time validation
-
-### **Transaction Cost Impact**
-- **Bid-Ask Spreads**: Immediate cost of trading
-- **Market Impact**: Price movement from large orders
-- **Commissions**: Fixed costs per transaction
-
-### **Regime Changes**
-- **Market Conditions**: Performance varies by market environment
-- **Structural Breaks**: Economic regime changes affect strategies
-- **Adaptation**: Models may need periodic retraining
-
----
-
-*Understanding these metrics and their interpretation is crucial for realistic evaluation of ML trading strategies. Focus on risk-adjusted metrics and always compare to appropriate benchmarks.*

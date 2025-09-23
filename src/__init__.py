@@ -6,8 +6,8 @@ with comprehensive benchmarking against naive strategies.
 """
 
 __version__ = "1.0.0"
-__author__ = "Yanis"
-__email__ = "your.email@example.com"
+__author__ = "Yanis Aksas"
+__email__ = "yanis.aksas@gmail.com"
 
 # Import main components for easy access
 from .strategies import get_all_naive_strategies, get_strategy_descriptions

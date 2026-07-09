@@ -1,10 +1,4 @@
 """Visits the deployed Streamlit app so it doesn't go to sleep from inactivity.
-
-Streamlit Community Cloud serves a static HTML shell to plain HTTP requests —
-the app's Python session only starts once a real browser loads the page and
-opens a websocket connection. A curl/requests ping doesn't trigger that, so
-this uses headless Chromium instead. If the app already went to sleep, it
-also finds and clicks the "get this app back up" button.
 """
 
 import sys

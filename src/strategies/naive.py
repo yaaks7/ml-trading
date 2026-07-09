@@ -163,7 +163,15 @@ class HistoricalFrequencyStrategy(BaseNaiveStrategy):
 
 
 class MomentumStrategy(BaseNaiveStrategy):
-    """Bets that yesterday's direction continues."""
+    """Bets that the most recent direction continues, re-evaluated at every row.
+
+    Unlike the other naive strategies, this one does look at X — specifically its
+    'Returns' column (added by DataFetcher for every real feature matrix). That's
+    what makes it walk-forward: predict(X_test) uses each row's own most-recent
+    price move, not a single value frozen at the end of training. Without this it
+    degenerates into a Bullish/Bearish clone — one constant prediction for the
+    whole test set, whatever the last training-set day happened to be.
+    """
 
     def __init__(self, random_state: Optional[int] = None):
         super().__init__("Momentum (Last Direction)", random_state)
@@ -173,23 +181,29 @@ class MomentumStrategy(BaseNaiveStrategy):
         self.last_direction = int(y.iloc[-1])
         momentum_accuracy = (y.iloc[1:].values == y.iloc[:-1].values).mean()
         self.strategy_info = {
-            'description': 'Predicts market will continue in the last observed direction',
+            'description': 'Predicts market will continue in the most recently observed direction',
             'last_training_direction': 'up' if self.last_direction == 1 else 'down',
             'momentum_persistence': momentum_accuracy,
             'expected_accuracy': momentum_accuracy,
         }
         self.is_fitted = True
-        logger.info(f"MomentumStrategy fitted. Last direction: {'up' if self.last_direction else 'down'}")
+        logger.info(f"MomentumStrategy fitted. Last training-set direction: {'up' if self.last_direction else 'down'}")
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if not self.is_fitted:
             raise ValueError("Strategy must be fitted before making predictions")
-        return np.full(len(X), self.last_direction, dtype=int)
+        if 'Returns' not in X.columns:
+            raise ValueError("MomentumStrategy needs a 'Returns' column in X (see DataFetcher)")
+        return (X['Returns'] > 0).astype(int).values
 
 
 class MeanReversionStrategy(BaseNaiveStrategy):
-    """Bets that yesterday's direction reverses (opposite of Momentum)."""
+    """Bets that the most recent direction reverses, re-evaluated at every row.
+
+    Mirror of MomentumStrategy — same walk-forward dependency on X['Returns'],
+    same reason for it (see MomentumStrategy's docstring).
+    """
 
     def __init__(self, random_state: Optional[int] = None):
         super().__init__("Mean Reversion (Contrarian)", random_state)
@@ -199,21 +213,22 @@ class MeanReversionStrategy(BaseNaiveStrategy):
         self.last_direction = int(y.iloc[-1])
         reversion_accuracy = (y.iloc[1:].values != y.iloc[:-1].values).mean()
         self.strategy_info = {
-            'description': 'Predicts market will reverse from the last observed direction',
+            'description': 'Predicts market will reverse from the most recently observed direction',
             'last_training_direction': 'up' if self.last_direction == 1 else 'down',
             'predicted_direction': 'down' if self.last_direction == 1 else 'up',
             'reversion_tendency': reversion_accuracy,
             'expected_accuracy': reversion_accuracy,
         }
         self.is_fitted = True
-        logger.info(f"MeanReversionStrategy fitted. Predicting opposite of: {'up' if self.last_direction else 'down'}")
+        logger.info(f"MeanReversionStrategy fitted. Last training-set direction: {'up' if self.last_direction else 'down'}")
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if not self.is_fitted:
             raise ValueError("Strategy must be fitted before making predictions")
-        opposite_direction = 1 - self.last_direction
-        return np.full(len(X), opposite_direction, dtype=int)
+        if 'Returns' not in X.columns:
+            raise ValueError("MeanReversionStrategy needs a 'Returns' column in X (see DataFetcher)")
+        return (X['Returns'] <= 0).astype(int).values
 
 
 def get_all_naive_strategies(random_state: Optional[int] = None) -> Dict[str, type]:

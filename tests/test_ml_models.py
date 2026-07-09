@@ -66,3 +66,62 @@ def test_predict_before_fit_raises():
     model = RandomForestModel()
     with pytest.raises(ValueError):
         model.predict(pd.DataFrame({'a': [1, 2, 3]}))
+
+
+def test_mlp_robust_to_feature_scale_disparity(synthetic_data):
+    """Regression test: the real feature matrix mixes wildly different scales
+    (Volume ~1e9 next to ratio features ~1.0). Fed unscaled into MLPClassifier,
+    this used to blow up the training loss and collapse predictions to near-noise
+    (measured: 92% -> 49% accuracy, loss 0.2 -> 18.2, on this exact fixture with
+    one huge-scale column added). MLPModel now standardizes internally, so this
+    should no longer degrade performance."""
+    from src.models.mlp import MLPModel
+
+    X_train, X_test, y_train, y_test = synthetic_data
+    rng = np.random.RandomState(0)
+
+    X_train = X_train.copy()
+    X_test = X_test.copy()
+    X_train['huge_scale_feature'] = rng.randn(len(X_train)) * 1e9
+    X_test['huge_scale_feature'] = rng.randn(len(X_test)) * 1e9
+
+    model = MLPModel(hidden_layer_sizes=(100,), max_iter=1000, random_state=42)
+    model.fit(X_train, y_train)
+    accuracy = accuracy_score(y_test, model.predict(X_test))
+
+    # Same bar as test_model_beats_random_guessing, but with a scale-disparate
+    # column mixed in — this is what actually failed before the fix.
+    assert accuracy > 0.7
+
+
+def test_random_forest_min_samples_leaf_reduces_overfitting(synthetic_data):
+    """Regression test: the Streamlit UI used to leave min_samples_leaf at
+    sklearn's default of 1, letting trees memorize individual training rows
+    (measured 99.9% train / 43% test accuracy on real data). Raising it should
+    meaningfully shrink the train-test gap, even if it doesn't raise test
+    accuracy — there's little real signal to find, regularizing just stops the
+    model from confidently fitting noise."""
+    from src.models.random_forest import RandomForestModel
+
+    rng = np.random.RandomState(42)
+    n_samples, n_features = 300, 20
+    X = pd.DataFrame(rng.randn(n_samples, n_features), columns=[f'f{i}' for i in range(n_features)])
+    # Weak signal buried in noise, mirroring "most of ~35 real features carry
+    # little information about next-day direction."
+    y = pd.Series((X['f0'] * 0.3 + X['f1'] * 0.3 + rng.randn(n_samples) * 1.5 > 0).astype(int))
+
+    split = int(0.7 * n_samples)
+    X_train, X_test = X.iloc[:split], X.iloc[split:]
+    y_train, y_test = y.iloc[:split], y.iloc[split:]
+
+    def train_test_gap(min_samples_leaf):
+        model = RandomForestModel(n_estimators=200, max_depth=10, min_samples_leaf=min_samples_leaf, random_state=42)
+        model.fit(X_train, y_train)
+        train_acc = accuracy_score(y_train, model.predict(X_train))
+        test_acc = accuracy_score(y_test, model.predict(X_test))
+        return train_acc - test_acc
+
+    unregularized_gap = train_test_gap(min_samples_leaf=1)
+    regularized_gap = train_test_gap(min_samples_leaf=20)
+
+    assert regularized_gap < unregularized_gap - 0.1

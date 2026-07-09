@@ -683,10 +683,19 @@ def render_step_2_model_configuration():
             if model_name == 'Random Forest':
                 with st.expander("Random Forest"):
                     n_estimators = st.slider("Trees:", 50, 500, 200, key=f"{model_name}_n_est")
-                    max_depth = st.slider("Max Depth:", 5, 50, 10, key=f"{model_name}_depth")
+                    max_depth = st.slider("Max Depth:", 5, 50, 6, key=f"{model_name}_depth")
+                    min_samples_leaf = st.slider(
+                        "Min Samples per Leaf:", 1, 100, 20, key=f"{model_name}_min_leaf",
+                    )
+                    st.caption(
+                        "Higher values regularize harder — with ~35 features and a few "
+                        "hundred training rows, the default of 1 lets trees memorize "
+                        "individual days instead of learning anything general."
+                    )
                     model_configs[model_name] = {
                         'n_estimators': n_estimators,
                         'max_depth': max_depth,
+                        'min_samples_leaf': min_samples_leaf,
                         'random_state': 42
                     }
             

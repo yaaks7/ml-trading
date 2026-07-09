@@ -15,14 +15,19 @@ from src.strategies import get_all_naive_strategies
 
 @pytest.fixture
 def synthetic_data():
-    """A mildly bullish synthetic market (60% up days) with unrelated features —
-    the strategies below don't use the features at all, only the target."""
+    """A mildly bullish synthetic market (60% up days) with unrelated filler
+    features — most strategies below ignore X entirely and only look at the
+    target. The exception is Momentum/MeanReversion, which read the 'Returns'
+    column (as DataFetcher always provides on real data), so it's included here
+    too even though its values are independent of y in this fixture."""
     rng = np.random.RandomState(42)
 
     y_train = pd.Series(rng.choice([0, 1], size=1000, p=[0.4, 0.6]))
     y_test = pd.Series(rng.choice([0, 1], size=200, p=[0.4, 0.6]))
     X_train = pd.DataFrame(rng.randn(1000, 10))
     X_test = pd.DataFrame(rng.randn(200, 10))
+    X_train['Returns'] = rng.randn(1000) * 0.01
+    X_test['Returns'] = rng.randn(200) * 0.01
 
     return X_train, X_test, y_train, y_test
 
@@ -74,3 +79,52 @@ def test_predict_before_fit_raises(synthetic_data):
     strategy = get_all_naive_strategies()['Random']()
     with pytest.raises(ValueError):
         strategy.predict(X_test)
+
+
+def test_momentum_is_walk_forward_not_frozen(synthetic_data):
+    """Regression test: Momentum used to store a single direction from the last
+    training row and repeat it for the whole test set (indistinguishable from
+    Bullish/Bearish). It should now track X['Returns'] row by row instead."""
+    X_train, X_test, y_train, y_test = synthetic_data
+    strategy = get_all_naive_strategies()['Momentum (Last Direction)']()
+    strategy.fit(X_train, y_train)
+
+    predictions = strategy.predict(X_test)
+    expected = (X_test['Returns'] > 0).astype(int).values
+
+    np.testing.assert_array_equal(predictions, expected)
+    # With 200 independent random Returns values, a frozen single-direction
+    # prediction would be a near-impossible coincidence.
+    assert 0 < predictions.sum() < len(predictions)
+
+
+def test_mean_reversion_is_walk_forward_not_frozen(synthetic_data):
+    X_train, X_test, y_train, y_test = synthetic_data
+    strategy = get_all_naive_strategies()['Mean Reversion (Contrarian)']()
+    strategy.fit(X_train, y_train)
+
+    predictions = strategy.predict(X_test)
+    expected = (X_test['Returns'] <= 0).astype(int).values
+
+    np.testing.assert_array_equal(predictions, expected)
+    assert 0 < predictions.sum() < len(predictions)
+
+
+def test_momentum_and_mean_reversion_are_opposites(synthetic_data):
+    X_train, X_test, y_train, y_test = synthetic_data
+    momentum = get_all_naive_strategies()['Momentum (Last Direction)']()
+    reversion = get_all_naive_strategies()['Mean Reversion (Contrarian)']()
+    momentum.fit(X_train, y_train)
+    reversion.fit(X_train, y_train)
+
+    assert (momentum.predict(X_test) != reversion.predict(X_test)).all()
+
+
+@pytest.mark.parametrize("name", ['Momentum (Last Direction)', 'Mean Reversion (Contrarian)'])
+def test_momentum_family_requires_returns_column(name, synthetic_data):
+    X_train, X_test, y_train, y_test = synthetic_data
+    strategy = get_all_naive_strategies()[name]()
+    strategy.fit(X_train, y_train)
+
+    with pytest.raises(ValueError):
+        strategy.predict(X_test.drop(columns=['Returns']))

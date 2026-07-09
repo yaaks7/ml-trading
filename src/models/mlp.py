@@ -2,8 +2,10 @@
 Multi-Layer Perceptron (Neural Network) model for trading predictions
 """
 
+import numpy as np
 import pandas as pd
 from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import StandardScaler
 from .base import BaseMLModel
 
 
@@ -38,15 +40,35 @@ class MLPModel(BaseMLModel):
         }
         
         self.model = self.create_model(**self.params)
-    
+        self.scaler = StandardScaler()
+
     def create_model(self, **kwargs):
         """Create MLP classifier"""
         return MLPClassifier(**kwargs)
-    
+
+    def _scale(self, X: pd.DataFrame, fit: bool) -> pd.DataFrame:
+        """Standardize features before they hit the network.
+
+        The raw feature matrix mixes wildly different scales — Volume in the
+        billions next to ratio features around 1.0 — which starves gradient
+        descent: pre-activations blow up, the loss diverges, and the model
+        converges to a degenerate constant-ish prediction instead of learning
+        anything. Random Forest doesn't need this (it's scale-invariant), so
+        this scaling lives here rather than in DataFetcher.
+        """
+        values = self.scaler.fit_transform(X) if fit else self.scaler.transform(X)
+        return pd.DataFrame(values, columns=X.columns, index=X.index)
+
     def fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
         """Fit MLP model"""
-        return super().fit(X, y, **kwargs)
-    
+        return super().fit(self._scale(X, fit=True), y, **kwargs)
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        return super().predict(self._scale(X, fit=False))
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        return super().predict_proba(self._scale(X, fit=False))
+
     def get_model_info(self) -> dict:
         """Get detailed model information"""
         info = {

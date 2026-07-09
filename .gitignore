@@ -104,3 +104,6 @@ Thumbs.db
 *.h5
 *.joblib
 *.model
+
+# Personal working notes / interview prep — not part of the project itself
+context/

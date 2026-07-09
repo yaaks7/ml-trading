@@ -18,17 +18,6 @@ class RandomForestModel(BaseMLModel):
                  max_features: str = 'sqrt',
                  random_state: int = 42,
                  **kwargs):
-        """
-        Initialize Random Forest model
-        
-        Args:
-            n_estimators: Number of trees in the forest
-            max_depth: Maximum depth of trees
-            min_samples_split: Minimum samples required to split a node
-            min_samples_leaf: Minimum samples required at a leaf node
-            max_features: Number of features to consider for best split
-            random_state: Random state for reproducibility
-        """
         super().__init__("Random Forest", **kwargs)
         
         self.params = {

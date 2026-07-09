@@ -22,21 +22,6 @@ class MLPModel(BaseMLModel):
                  early_stopping: bool = True,
                  validation_fraction: float = 0.1,
                  **kwargs):
-        """
-        Initialize MLP model
-        
-        Args:
-            hidden_layer_sizes: Tuple defining the number of neurons in each hidden layer
-            activation: Activation function ('relu', 'tanh', 'logistic')
-            solver: Solver for weight optimization ('adam', 'lbfgs', 'sgd')
-            alpha: L2 penalty (regularization term) parameter
-            learning_rate: Learning rate schedule ('constant', 'invscaling', 'adaptive')
-            learning_rate_init: Initial learning rate
-            max_iter: Maximum number of iterations
-            random_state: Random state for reproducibility
-            early_stopping: Whether to use early stopping
-            validation_fraction: Fraction of training data to use for validation
-        """
         super().__init__("MLP", **kwargs)
         
         self.params = {

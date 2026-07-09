@@ -1,9 +1,4 @@
-"""
-ML Trading Prediction System - Source Package
-
-A modular system for predicting financial market direction using machine learning
-with comprehensive benchmarking against naive strategies.
-"""
+"""Data fetching, ML models, and naive baseline strategies for next-day direction prediction."""
 
 __version__ = "1.0.0"
 __author__ = "Yanis Aksas"

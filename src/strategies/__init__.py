@@ -1,7 +1,3 @@
-"""
-Strategy modules for ML Trading Prediction System
-"""
-
 from .naive import (
     BaseNaiveStrategy,
     AlwaysUpStrategy,

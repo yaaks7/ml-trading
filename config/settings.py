@@ -1,5 +1,5 @@
 """
-Configuration settings for ML Trading Prediction System
+Asset registry and config dataclasses for data fetching and model hyperparameters.
 """
 
 from typing import Dict, List, Any
@@ -22,13 +22,6 @@ class ModelConfig:
     mlp_solver: str = 'adam'
     mlp_max_iter: int = 1000
     mlp_random_state: int = 42
-    
-    # LSTM
-    lstm_units: int = 64
-    lstm_dropout: float = 0.2
-    lstm_epochs: int = 50
-    lstm_batch_size: int = 32
-    lstm_sequence_length: int = 60
 
 
 @dataclass
@@ -55,21 +48,6 @@ class DataConfig:
     def __post_init__(self):
         if self.ma_periods is None:
             self.ma_periods = [5, 10, 20, 50, 200]
-
-
-@dataclass
-class BacktestConfig:
-    """Configuration for backtesting and evaluation"""
-    initial_capital: float = 10000.0
-    commission: float = 0.001  # 0.1%
-    slippage: float = 0.001    # 0.1%
-    
-    # Risk management
-    max_position_size: float = 0.95  # 95% of capital
-    min_confidence: float = 0.6      # Minimum prediction confidence
-    
-    # Performance metrics
-    risk_free_rate: float = 0.02     # 2% annual risk-free rate
 
 
 # Supported assets with their configurations
@@ -189,10 +167,11 @@ SUPPORTED_ASSETS = {
     }
 }
 
-# Streamlit configuration
+# Kept for reference / potential reuse — streamlit_app/app.py currently calls
+# st.set_page_config() directly with these same values.
 STREAMLIT_CONFIG = {
-    'page_title': 'ML Trading Prediction System',
-    'page_icon': '🤖',
+    'page_title': 'ML Trading Prediction',
+    'page_icon': '📈',
     'layout': 'wide',
     'initial_sidebar_state': 'expanded'
 }

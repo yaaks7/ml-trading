@@ -1,18 +1,13 @@
 """
-Data fetching and preprocessing module for ML Trading Prediction System
+Fetches OHLCV data from Yahoo Finance and turns it into a feature matrix + target.
 """
 
 import yfinance as yf
 import pandas as pd
 import numpy as np
 from typing import Optional, Tuple, Dict, List
-from datetime import datetime
 import logging
-import sys
-import os
 
-# Add config to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from config import DataConfig
 
 logger = logging.getLogger(__name__)
@@ -74,12 +69,6 @@ class DataFetcher:
     """Handles data fetching and preprocessing for trading strategies"""
     
     def __init__(self, config: Optional[DataConfig] = None):
-        """
-        Initialize DataFetcher
-        
-        Args:
-            config: Data configuration object
-        """
         self.config = config or DataConfig()
         self.data = None
         self.processed_data = None
@@ -89,19 +78,7 @@ class DataFetcher:
                    start_date: Optional[str] = None, 
                    end_date: Optional[str] = None, 
                    interval: Optional[str] = None) -> pd.DataFrame:
-        """
-        Fetch financial data from Yahoo Finance
-        
-        Args:
-            symbol: Trading symbol (e.g., '^GSPC', 'BTC-USD')
-            start_date: Start date in 'YYYY-MM-DD' format
-            end_date: End date in 'YYYY-MM-DD' format
-            interval: Data interval (1m, 5m, 15m, 1h, 1d, etc.)
-            
-        Returns:
-            pd.DataFrame: OHLCV data with datetime index
-        """
-        # Use config defaults if not specified
+        """Fetch OHLCV data for `symbol` from Yahoo Finance. Falls back to config defaults for any date/interval left unset."""
         start_date = start_date or self.config.start_date
         end_date = end_date or self.config.end_date
         interval = interval or self.config.interval
@@ -115,19 +92,14 @@ class DataFetcher:
             if data.empty:
                 raise ValueError(f"No data found for symbol {symbol}")
             
-            # Fix column names if they are MultiIndex (happens with multiple symbols)
+            # yfinance returns a MultiIndex when the ticker list has one entry wrapped oddly
             if isinstance(data.columns, pd.MultiIndex):
                 data.columns = data.columns.droplevel(1)
-            
-            # Ensure column names are standardized
+
             data.columns = [col.title() for col in data.columns]
-            
-            # Remove any rows with missing data
             data = data.dropna()
-            
-            # Sort by date to ensure chronological order
             data = data.sort_index()
-            
+
             self.data = data
             logger.info(f"Successfully fetched {len(data)} data points for {symbol}")
             
@@ -138,15 +110,7 @@ class DataFetcher:
             raise
     
     def add_technical_indicators(self, data: pd.DataFrame) -> pd.DataFrame:
-        """
-        Add technical indicators to the dataset
-        
-        Args:
-            data: OHLCV dataframe
-            
-        Returns:
-            pd.DataFrame: Data with added technical indicators
-        """
+        """Add moving averages, RSI, MACD, Bollinger Bands, ATR, and momentum/microstructure features to an OHLCV frame."""
         df = data.copy()
         
         try:
@@ -222,97 +186,58 @@ class DataFetcher:
         return df
     
     def create_target_variable(self, data: pd.DataFrame, target_column: str = 'Close') -> pd.DataFrame:
-        """
-        Create target variable for direction prediction
-        
-        Args:
-            data: DataFrame with price data
-            target_column: Column to use for target creation (default: 'Close')
-            
-        Returns:
-            pd.DataFrame: Data with target variable added
-        """
+        """Label each row with whether `target_column` closes higher the next day."""
         df = data.copy()
-        
-        # Create tomorrow's price
+
         df['Tomorrow_Price'] = df[target_column].shift(-1)
-        
-        # Create binary target: 1 if price goes up, 0 if down
         df['Target'] = (df['Tomorrow_Price'] > df[target_column]).astype(int)
-        
-        # Remove the last row as it won't have a target
-        df = df[:-1]
+        df = df[:-1]  # last row has no next-day price to compare against
         
         logger.info(f"Created target variable. Target distribution: {df['Target'].value_counts().to_dict()}")
         
         return df
     
     def prepare_features(self, data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
-        """
-        Prepare feature matrix and target vector
-        
-        Args:
-            data: DataFrame with all data including target
-            
-        Returns:
-            Tuple of (features_df, target_series)
-        """
+        """Split into (X, y), dropping the columns that would leak the target."""
         df = data.copy()
-        
-        # Define feature columns (exclude target and future-looking columns)
+
         exclude_columns = [
-            'Target', 'Tomorrow_Price', 
-            'Adj Close', 'Dividends', 'Stock Splits'  # Yahoo Finance specific columns
+            'Target', 'Tomorrow_Price',
+            'Adj Close', 'Dividends', 'Stock Splits'
         ]
-        
         feature_columns = [col for col in df.columns if col not in exclude_columns]
-        
-        # Select features and target
+
         X = df[feature_columns]
         y = df['Target']
-        
-        # Smart NaN handling: instead of dropping all rows with any NaN,
-        # find the first row where we have enough valid data
-        # This is particularly important for MA indicators with large periods
-        
-        # Find the maximum lookback period from our indicators
+
+        # Rolling-window indicators (MA_200, Trend_20, ...) are NaN for their lookback
+        # period. Rather than dropping every row with any NaN, skip past the longest
+        # lookback window and forward-fill the rest.
         max_lookback = 0
         for col in X.columns:
-            if 'MA_' in col:
+            if 'MA_' in col or 'Trend_' in col or 'Price_Change_' in col:
                 try:
                     period = int(col.split('_')[1])
                     max_lookback = max(max_lookback, period)
-                except:
+                except ValueError:
                     pass
-            elif 'Trend_' in col or 'Price_Change_' in col:
-                try:
-                    period = int(col.split('_')[1])
-                    max_lookback = max(max_lookback, period)
-                except:
-                    pass
-        
-        # Use a more conservative approach: start from the max lookback period
-        # This ensures we have valid data for most indicators
-        start_idx = max(max_lookback, 20)  # At minimum, skip first 20 rows
-        
+
+        start_idx = max(max_lookback, 20)
+
         if start_idx < len(X):
             X = X.iloc[start_idx:]
             y = y.iloc[start_idx:]
-            
-            # Now only remove rows where target or critical features are NaN
-            # Define critical features that should never be NaN
+
             critical_features = ['Close', 'High', 'Low', 'Open', 'Volume', 'Returns']
             critical_features = [col for col in critical_features if col in X.columns]
-            
-            # Remove rows where target is NaN or critical features are NaN
+
             valid_indices = ~(y.isnull() | X[critical_features].isnull().any(axis=1))
             X = X[valid_indices]
             y = y[valid_indices]
-            
-            # For remaining NaN values in non-critical features, use forward fill
             X = X.ffill().bfill()
         else:
-            # If we don't have enough data, fall back to the original method
+            # Not enough rows to skip past the lookback window; fall back to dropping
+            # any row with a NaN.
             valid_indices = ~(X.isnull().any(axis=1) | y.isnull())
             X = X[valid_indices]
             y = y[valid_indices]
@@ -323,23 +248,12 @@ class DataFetcher:
         return X, y
     
     def split_data(self, X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
-        """
-        Split data into train, validation, and test sets chronologically
-        
-        Args:
-            X: Feature matrix
-            y: Target vector
-            
-        Returns:
-            Tuple of (X_train, X_val, X_test, y_train, y_val, y_test)
-        """
+        """Chronological train/val/test split — no shuffling, this is a time series."""
         n_samples = len(X)
-        
-        # Calculate split indices
+
         train_end = int(n_samples * self.config.train_ratio)
         val_end = int(n_samples * (self.config.train_ratio + self.config.val_ratio))
-        
-        # Split chronologically (important for time series)
+
         X_train = X.iloc[:train_end]
         X_val = X.iloc[train_end:val_end]
         X_test = X.iloc[val_end:]
@@ -355,15 +269,7 @@ class DataFetcher:
         return X_train, X_val, X_test, y_train, y_val, y_test
     
     def get_data_summary(self, data: pd.DataFrame) -> Dict:
-        """
-        Get summary statistics of the dataset
-        
-        Args:
-            data: DataFrame to summarize
-            
-        Returns:
-            Dictionary with summary statistics
-        """
+        """Row/column counts, price range, and target distribution for a processed frame."""
         summary = {
             'rows': len(data),
             'columns': len(data.columns),
@@ -390,42 +296,25 @@ class DataFetcher:
         return summary
     
     def process_symbol(self, symbol: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Tuple[pd.DataFrame, pd.Series]:
-        """
-        Complete processing pipeline for a symbol
-        
-        Args:
-            symbol: Trading symbol
-            start_date: Start date (optional)
-            end_date: End date (optional)
-            
-        Returns:
-            Tuple of (features, target)
-        """
+        """Fetch, add indicators, label, and clean — end to end for one symbol."""
         logger.info(f"Starting complete processing for {symbol}")
-        
-        # Fetch raw data
+
         raw_data = self.fetch_data(symbol, start_date, end_date)
-        
-        # Add technical indicators
         data_with_indicators = self.add_technical_indicators(raw_data)
-        
-        # Create target variable
         data_with_target = self.create_target_variable(data_with_indicators)
-        
-        # Prepare features and target
         X, y = self.prepare_features(data_with_target)
-        
+
         self.processed_data = data_with_target
-        
+
         logger.info(f"Processing complete for {symbol}")
         return X, y
-    
+
     def fetch_and_prepare(self, symbol: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Tuple[pd.DataFrame, pd.Series]:
-        """Alias for process_symbol for compatibility with Streamlit app"""
+        """Alias for process_symbol; the Streamlit app calls it under this name."""
         return self.process_symbol(symbol, start_date, end_date)
-    
+
     def get_raw_data(self):
-        """Get the processed data with indicators, falls back to raw data if not available"""
+        """Processed data with indicators if available, otherwise the raw OHLCV frame."""
         if self.processed_data is not None:
             return self.processed_data
         return self.data

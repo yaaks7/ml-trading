@@ -1,91 +1,32 @@
-# 📈 Benchmark Strategies Guide
+# Benchmark strategies
 
-> Guide to the benchmark strategies used to evaluate ML model performance: Buy & Hold and Moving Average strategies.
+Six naive strategies used to sanity-check the ML models. Every one of them ignores
+the feature matrix entirely — they only look at the target series `y` (and sometimes
+not even that). If a Random Forest or MLP can't beat these, it isn't learning anything
+useful.
 
-## 📋 Overview
+Implementation: [src/strategies/naive.py](../src/strategies/naive.py).
 
-Benchmark strategies serve as **performance baselines** to evaluate whether machine learning models add value over simple, traditional approaches. The system implements two fundamental strategies:
+| Strategy | Predicts | Notes |
+|---|---|---|
+| Bullish | Always up | Baseline for an asset with a long-term upward drift. Its expected accuracy equals the training up-ratio. |
+| Bearish | Always down | Mirror of Bullish. |
+| Random | 50/50 coin flip | The null hypothesis — anything should beat this. |
+| Frequency | Samples from the historical up/down ratio | Slightly smarter than Random: if the market went up 57% of the time in training, it predicts up 57% of the time. |
+| Momentum | Repeats the last observed direction | Bet that yesterday's direction continues. |
+| Mean Reversion | Opposite of the last observed direction | Bet that yesterday's direction reverses. |
 
-- **Buy & Hold**: The simplest long-term investment strategy
-- **Moving Average**: Classic technical analysis approach
+## Why these and not Buy & Hold / Sharpe ratio benchmarks
 
-These benchmarks help answer: *"Is the ML model actually better than doing nothing or using basic technical analysis?"*
+This project evaluates a next-day **direction classifier**, not a trading strategy —
+there's no position sizing, transaction costs, or portfolio value being tracked. So
+the natural benchmarks are other ways of guessing direction, not investment strategies.
+Buy & Hold, moving-average crossovers, and risk-adjusted return metrics (Sharpe,
+drawdown, etc.) belong to a backtesting layer this project doesn't implement.
 
----
+## Reading the comparison
 
-## 💼 Buy & Hold Strategy
-
-### **Concept**
-Buy & Hold is the simplest investment strategy: buy an asset and hold it for the entire period, regardless of market fluctuations.
-
-### **How It Works**
-1. **Initial Investment**: Invest 100% of capital at the beginning
-2. **Hold Period**: Maintain position throughout the entire timeframe
-3. **No Trading**: Zero transactions after initial purchase
-4. **Final Return**: Calculate total return at the end
-
-### **Mathematical Formula**
-```
-Return = (Final_Price - Initial_Price) / Initial_Price
-```
-
----
-
-## 📊 Moving Average Strategy
-
-### **Concept**
-Moving Average strategy uses the relationship between current price and its historical average to generate buy/sell signals.
-
-### **How It Works**
-1. **Calculate Moving Average**: Average price over N periods
-2. **Generate Signals**: 
-   - **BUY** when price > moving average (uptrend)
-   - **SELL** when price < moving average (downtrend)
-3. **Position Management**: Switch between long and cash positions
-4. **Trend Following**: Captures sustained price movements
-
-### **Mathematical Formula**
-```
-MA(n) = (P₁ + P₂ + ... + Pₙ) / n
-Signal = 1 if Price > MA(n), else 0
-```
-
-### **Common Variations**
-- **SMA (Simple Moving Average)**: Equal weight to all periods
-- **EMA (Exponential Moving Average)**: More weight to recent prices
-- **Different Periods**: 20, 50, 100, 200 days are common
-
-### **Key Parameters**
-```python
-ma_period = 20  # Number of periods for moving average
-# Shorter periods: More responsive, more signals
-# Longer periods: Smoother, fewer signals
-```
-
----
-
-## 📊 Performance Metrics for Benchmarks
-
-### **Buy & Hold Metrics**
-- **Total Return**: Same as underlying asset
-- **Volatility**: Same as underlying asset
-- **Sharpe Ratio**: (Return - Risk-free) / Volatility
-- **Maximum Drawdown**: Worst peak-to-trough decline
-- **Calmar Ratio**: Return / Maximum Drawdown
-
-### **Moving Average Metrics**
-- **Total Return**: Strategy return vs buy & hold
-- **Win Rate**: Percentage of profitable trades
-- **Average Trade**: Mean profit/loss per trade
-- **Profit Factor**: Gross profit / Gross loss
-- **Time in Market**: Percentage of time holding positions
-
----
-## **Key Questions to Answer:**
-1. Does ML model beat buy & hold on risk-adjusted basis?
-2. Does ML model reduce maximum drawdowns significantly?
-4. Is outperformance consistent across different periods?
-5. Does model add value in different market conditions?
-
----
-
+If Random Forest gets 54% test accuracy and Frequency gets 53%, the model is barely
+adding anything over "guess the historical average." If it's beating Bullish/Bearish/
+Random by a real margin *and* holding up on the test set (not just train), that's a
+more interesting result.
